@@ -14,12 +14,14 @@ Use the bundled scripts for computation. Do not construct bioinformatics command
 
    ```bash
      python3 scripts/screen_isolate.py INPUT [INPUT_R2] --output OUTPUT_DIR \
-     [--database-root DATABASE_ROOT] [--organism ORGANISM_KEY]
+     [--database-root DATABASE_ROOT] [--organism ORGANISM_KEY] [--snp-resolve]
    ```
 
 3. Read `OUTPUT_DIR/result.json`. Use `status`, `stop_reason`, and `user_summary` as the authoritative result.
 4. Report the concise summary first. State that a candidate is a screening result, not proof of outbreak relatedness. Recommend a validated high-resolution SNP comparison when a candidate is present.
 5. Link the user to `result.json`, `provenance.json`, and retained logs. Never invent a result if a file is missing or a stage failed.
+
+Pass `--snp-resolve` to additionally compute ska2 pairwise SNP distances between the query and the relevant Mashpit representatives once a candidate is found (read [references/snp-resolution.md](references/snp-resolution.md) first). This is opt-in because, unlike the rest of the screen, it downloads representative genomes from NCBI. Report `result.json`'s `snp_resolution` block alongside the Mash result when present, including whether it agrees with Mashpit's top candidate.
 
 The script accepts exactly one assembly (`.fa`, `.fasta`, `.fna`) or one recognized R1/R2 FASTQ pair. The FASTQ path uses the fixed workflow described in [references/workflow.md](references/workflow.md). Long reads, hybrid reads, interleaved reads, and metagenomes are unsupported.
 
@@ -34,6 +36,7 @@ Read references only as needed:
 - [references/qc-policy.md](references/qc-policy.md): deterministic PASS/WARN/FAIL rules and evidence
 - [references/database-routing.md](references/database-routing.md): user/local-MLST routing contract
 - [references/mashpit-interpretation.md](references/mashpit-interpretation.md): result categories and wording
+- [references/snp-resolution.md](references/snp-resolution.md): optional ska2 SNP-distance refinement of a Mashpit candidate
 - [references/limitations.md](references/limitations.md): scope and scientific limitations
 
 ## Preserve reproducibility

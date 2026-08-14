@@ -1,6 +1,6 @@
 {
-  "skill_version": "1.0.0",
-  "workflow_version": "1.1.0",
+  "skill_version": "1.1.0",
+  "workflow_version": "1.2.0",
   "container_image": "ghcr.io/example/mashpit-isolate-screen:1.0.0",
   "container_digest": "SET_AT_RELEASE",
   "tools": {
@@ -9,7 +9,9 @@
     "quast": "5.3.0",
     "mlst": "2.35.0",
     "sourmash": "4.8.14",
-    "mashpit": "git-538d3421302fe6dd129780605b8ff5dedbf4c046c"
+    "mashpit": "git-538d3421302fe6dd129780605b8ff5dedbf4c046c",
+    "ska": "0.5.1",
+    "datasets": "18.35.0"
   },
   "assembly": {
     "fastp_args": ["--detect_adapter_for_pe", "--length_required", "50"],
@@ -28,5 +30,9 @@
     "number": 200,
     "threshold": 0.85,
     "tie_tolerance_hashes": 2
+  },
+  "snp_resolution": {
+    "profile": "default-v1",
+    "kmer_size": 31
   }
 }

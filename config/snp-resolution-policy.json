@@ -1,0 +1,7 @@
+{
+  "policy_version": "1.0.0",
+  "max_representatives_per_cluster": 5,
+  "max_total_genomes": 20,
+  "download_attempts": 3,
+  "download_retry_delay_seconds": 5
+}

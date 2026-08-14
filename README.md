@@ -39,6 +39,10 @@ Omit `--organism salmonella` to invoke local MLST auto-detection. For paired rea
 
 The output directory must not already exist. Review `result.json` first and retain `provenance.json` plus the logs.
 
+## Refine a candidate with ska2 SNP distances (optional)
+
+Add `--snp-resolve` to the same command to, once a Mashpit candidate is found, download the relevant representative genomes from NCBI and compute pairwise SNP distances with ska2 against the query. Unlike the rest of the screen, this step reaches out to NCBI (for public reference genomes only — the query is never uploaded), so it is opt-in rather than automatic. See [references/snp-resolution.md](mashpit-isolate-screen/references/snp-resolution.md) for the selection and interpretation rules.
+
 ## Test without biological tools or databases
 
 ```bash

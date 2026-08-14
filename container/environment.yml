@@ -9,6 +9,8 @@ dependencies:
   - quast=5.3.0
   - mlst=2.35.0
   - sourmash=4.8.14
+  - ska2=0.5.1
+  - ncbi-datasets-cli=18.35.0
   - pip=24.2
   - pip:
       - mashpit @ https://github.com/tongzhouxu/mashpit/archive/538d3421302fe6dd129780605b8ff5dedbf4c046c.tar.gz

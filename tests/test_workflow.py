@@ -15,11 +15,15 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from collect_provenance import collect
 from classify_with_mlst import interpret_mlst, parse_mlst_csv, route_for_organism
 from common import WorkflowError
+from fetch_reference_genomes import fetch_genomes
 from inspect_input import inspect
+from interpret_snp_resolution import interpret as interpret_snp_resolution
 from parse_mashpit_results import interpret, load_candidates
 from run_assembly_workflow import run_workflow
 from run_mashpit import run_mashpit, validate_database
+from run_ska import parse_distance_table, run_ska
 from screen_isolate import screen
+from select_snp_targets import select_targets
 from validate_assembly import assess
 from validate_fastq import validate_pair
 
@@ -209,6 +213,185 @@ class FailureAndProvenanceTests(unittest.TestCase):
             value = collect([path], path, {"name": "salmonella"}, [["mashpit", "query"]])
             self.assertEqual(len(value["inputs"][0]["sha256"]), 64)
             self.assertIn("538d342", value["pinned_tool_versions"]["mashpit"])
+
+
+class SnpResolutionTests(unittest.TestCase):
+    def write_mashpit_output(self, output_dir: Path, cluster_rows, representative_rows) -> None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with (output_dir / "sample_cluster_candidates.csv").open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["PDS_acc", "best_similarity_score", "near_top"])
+            writer.writeheader()
+            writer.writerows(cluster_rows)
+        with (output_dir / "sample_representative_matches.csv").open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(
+                handle, fieldnames=["asm_acc", "biosample_acc", "PDS_acc", "similarity_score"]
+            )
+            writer.writeheader()
+            writer.writerows(representative_rows)
+
+    def test_select_targets_unambiguous_uses_only_top_cluster(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_dir = Path(temporary)
+            self.write_mashpit_output(
+                output_dir,
+                [
+                    {"PDS_acc": "PDS0001", "best_similarity_score": "0.99", "near_top": "False"},
+                    {"PDS_acc": "PDS0002", "best_similarity_score": "0.80", "near_top": "False"},
+                ],
+                [
+                    {"asm_acc": "GCA_1", "biosample_acc": "SAMN1", "PDS_acc": "PDS0001", "similarity_score": "0.99"},
+                    {"asm_acc": "GCA_2", "biosample_acc": "SAMN2", "PDS_acc": "PDS0001", "similarity_score": "0.95"},
+                    {"asm_acc": "GCA_3", "biosample_acc": "SAMN3", "PDS_acc": "PDS0002", "similarity_score": "0.80"},
+                ],
+            )
+            policy = {"max_representatives_per_cluster": 5, "max_total_genomes": 20}
+            result = select_targets(output_dir, policy)
+            self.assertEqual(result["status"], "SELECTED")
+            self.assertEqual(result["relevant_clusters"], ["PDS0001"])
+            accessions = {item["accession"] for item in result["targets"]}
+            self.assertEqual(accessions, {"GCA_1", "GCA_2"})
+
+    def test_select_targets_ambiguous_includes_near_top_cluster(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_dir = Path(temporary)
+            self.write_mashpit_output(
+                output_dir,
+                [
+                    {"PDS_acc": "PDS0001", "best_similarity_score": "0.99", "near_top": "True"},
+                    {"PDS_acc": "PDS0002", "best_similarity_score": "0.985", "near_top": "True"},
+                ],
+                [
+                    {"asm_acc": "GCA_1", "biosample_acc": "SAMN1", "PDS_acc": "PDS0001", "similarity_score": "0.99"},
+                    {"asm_acc": "GCA_2", "biosample_acc": "SAMN2", "PDS_acc": "PDS0002", "similarity_score": "0.985"},
+                ],
+            )
+            policy = {"max_representatives_per_cluster": 5, "max_total_genomes": 20}
+            result = select_targets(output_dir, policy)
+            self.assertEqual(sorted(result["relevant_clusters"]), ["PDS0001", "PDS0002"])
+            accessions = {item["accession"] for item in result["targets"]}
+            self.assertEqual(accessions, {"GCA_1", "GCA_2"})
+
+    def test_select_targets_respects_total_genome_cap(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_dir = Path(temporary)
+            self.write_mashpit_output(
+                output_dir,
+                [
+                    {"PDS_acc": "PDS0001", "best_similarity_score": "0.99", "near_top": "True"},
+                    {"PDS_acc": "PDS0002", "best_similarity_score": "0.985", "near_top": "True"},
+                ],
+                [
+                    {"asm_acc": "GCA_1", "biosample_acc": "SAMN1", "PDS_acc": "PDS0001", "similarity_score": "0.99"},
+                    {"asm_acc": "GCA_2", "biosample_acc": "SAMN2", "PDS_acc": "PDS0002", "similarity_score": "0.985"},
+                ],
+            )
+            policy = {"max_representatives_per_cluster": 5, "max_total_genomes": 1}
+            result = select_targets(output_dir, policy)
+            self.assertEqual(len(result["targets"]), 1)
+            self.assertEqual(result["targets"][0]["accession"], "GCA_1")
+
+    @patch("fetch_reference_genomes.download_batch")
+    @patch("fetch_reference_genomes.require_executable", return_value="/usr/bin/datasets")
+    def test_fetch_genomes_partial_success_and_retry(self, _executable, download_batch):
+        def fake_download(datasets_exe, accessions, batch_dir):
+            batch_dir.mkdir(parents=True, exist_ok=True)
+            if "GOOD1" in accessions:
+                target = batch_dir / "ncbi_dataset" / "data" / "GOOD1"
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "GOOD1_genomic.fna").write_text(">contig\nACGT\n", encoding="ascii")
+            return (["datasets", "download"], ["datasets", "rehydrate"])
+
+        download_batch.side_effect = fake_download
+        with tempfile.TemporaryDirectory() as temporary:
+            result = fetch_genomes(["GOOD1", "BAD1"], Path(temporary) / "genomes", attempts=2, retry_delay_seconds=0)
+            self.assertEqual(result["status"], "PARTIAL")
+            self.assertIn("GOOD1", result["verified"])
+            self.assertEqual(result["unavailable"], ["BAD1"])
+            self.assertEqual(download_batch.call_count, 2)
+
+    def test_parse_distance_table_matches_pinned_ska_header(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "distances.tsv"
+            path.write_text(
+                "Sample1\tSample2\tDistance\tMismatches (proportion)\tMatch count\tMismatch count\n"
+                "QUERY\tGCA_1\t3.00\t0.01234\t100000\t50\n",
+                encoding="utf-8",
+            )
+            rows = parse_distance_table(path)
+            self.assertEqual(rows, [{
+                "sample1": "QUERY", "sample2": "GCA_1", "snp_distance": 3.0,
+                "mismatch_proportion": 0.01234, "match_count": 100000, "mismatch_count": 50,
+            }])
+
+    def test_parse_distance_table_rejects_unexpected_header(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "distances.tsv"
+            path.write_text("Sample1\tSample2\tSNPs\n", encoding="utf-8")
+            with self.assertRaises(WorkflowError):
+                parse_distance_table(path)
+
+    def test_run_ska_requires_at_least_two_genomes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(WorkflowError):
+                run_ska({"QUERY": "query.fasta"}, Path(temporary), 31)
+
+    @patch("run_ska.require_executable", return_value="/usr/bin/ska")
+    def test_run_ska_builds_file_list_and_parses_distances(self, _executable):
+        def fake_run_logged(command, cwd, stdout_path, stderr_path):
+            if command[1] == "build":
+                (cwd / "merged.skf").write_text("fake-skf", encoding="utf-8")
+            elif command[1] == "distance":
+                Path(command[3]).write_text(
+                    "Sample1\tSample2\tDistance\tMismatches (proportion)\tMatch count\tMismatch count\n"
+                    "QUERY\tGCA_1\t4.00\t0.02\t99000\t80\n",
+                    encoding="utf-8",
+                )
+            return 0
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output_dir = Path(temporary)
+            with patch("run_ska.run_logged", side_effect=fake_run_logged) as logged:
+                result = run_ska({"QUERY": "query.fasta", "GCA_1": "gca1.fasta"}, output_dir, 31)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["distances"][0]["snp_distance"], 4.0)
+            build_command = logged.call_args_list[0].args[0]
+            self.assertEqual(build_command[:2], ["/usr/bin/ska", "build"])
+            self.assertIn("-k", build_command)
+            file_list = (output_dir / "ska_input.tsv").read_text(encoding="utf-8")
+            self.assertIn("QUERY\tquery.fasta", file_list)
+            self.assertIn("GCA_1\tgca1.fasta", file_list)
+
+    def test_interpret_snp_resolution_flags_disagreement_with_mash(self):
+        rows = [
+            {"sample1": "QUERY", "sample2": "GCA_1", "snp_distance": 5.0,
+             "mismatch_proportion": 0.01, "match_count": 100, "mismatch_count": 1},
+            {"sample1": "GCA_2", "sample2": "QUERY", "snp_distance": 2.0,
+             "mismatch_proportion": 0.01, "match_count": 100, "mismatch_count": 1},
+        ]
+        targets = [
+            {"accession": "GCA_1", "cluster": "PDS0001"},
+            {"accession": "GCA_2", "cluster": "PDS0002"},
+        ]
+        result = interpret_snp_resolution(rows, targets, "PDS0001")
+        self.assertEqual(result["status"], "RESOLVED")
+        self.assertEqual(result["nearest_sample"], "GCA_2")
+        self.assertEqual(result["nearest_cluster"], "PDS0002")
+        self.assertFalse(result["agrees_with_mash_top_candidate"])
+        self.assertTrue(result["warnings"])
+
+    def test_interpret_snp_resolution_agrees_with_mash(self):
+        rows = [{"sample1": "QUERY", "sample2": "GCA_1", "snp_distance": 1.0,
+                  "mismatch_proportion": 0.0, "match_count": 100, "mismatch_count": 0}]
+        targets = [{"accession": "GCA_1", "cluster": "PDS0001"}]
+        result = interpret_snp_resolution(rows, targets, "PDS0001")
+        self.assertTrue(result["agrees_with_mash_top_candidate"])
+        self.assertEqual(result["warnings"], [])
+
+    def test_interpret_snp_resolution_insufficient_data_without_query_rows(self):
+        rows = [{"sample1": "GCA_1", "sample2": "GCA_2", "snp_distance": 1.0,
+                  "mismatch_proportion": 0.0, "match_count": 100, "mismatch_count": 0}]
+        result = interpret_snp_resolution(rows, [], None)
+        self.assertEqual(result["status"], "INSUFFICIENT_DATA")
 
 
 if __name__ == "__main__":

@@ -39,3 +39,7 @@ The assembly component returns:
 Any future replacement assembly Skill must satisfy this contract and must not weaken input validation or QC stop rules.
 
 `--organism` directly selects a supported database when the organism is already known. Without it, local `mlst` 2.35.0 auto-detects a bundled PubMLST scheme. The classifier's complete CSV, stderr log, normalized routing JSON, and command are retained.
+
+## Optional SNP resolution
+
+With `--snp-resolve`, once Mashpit returns a candidate, an additional stage selects representative genomes from the relevant cluster(s), downloads them from NCBI, and runs ska2 to compute pairwise SNP distances against the query. See [references/snp-resolution.md](snp-resolution.md). This stage is opt-in and its failure only downgrades `result.json` to a warning — it never turns an otherwise-successful Mash screen into a stopped one.
