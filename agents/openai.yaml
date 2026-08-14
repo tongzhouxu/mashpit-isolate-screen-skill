@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mashpit Isolate Screen"
+  short_description: "Screen bacterial isolates reproducibly"
+  default_prompt: "Use $mashpit-isolate-screen to screen these bacterial reads or assembly with Mashpit."

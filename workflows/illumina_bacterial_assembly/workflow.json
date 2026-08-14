@@ -1,0 +1,7 @@
+{
+  "name": "illumina-bacterial-assembly",
+  "version": "1.0.0",
+  "implementation": "../../scripts/run_assembly_workflow.py",
+  "input_contract": "paired, non-interleaved Illumina FASTQ/FASTQ.GZ",
+  "output_contract": "../../references/workflow.md"
+}

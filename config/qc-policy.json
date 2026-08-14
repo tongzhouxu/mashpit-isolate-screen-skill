@@ -1,0 +1,24 @@
+{
+  "policy_version": "1.0.0",
+  "generic": {
+    "minimum_total_length_fail": 1000000,
+    "maximum_total_length_fail": 10000000,
+    "minimum_n50_fail": 10000,
+    "minimum_n50_warn": 20000,
+    "maximum_contigs_fail": 500,
+    "maximum_contigs_warn": 300,
+    "maximum_ambiguous_fraction_fail": 0.05,
+    "maximum_ambiguous_fraction_warn": 0.01
+  },
+  "read_qc": {
+    "minimum_estimated_coverage_fail": 20.0,
+    "minimum_q30_fraction_warn": 0.80
+  },
+  "organisms": {
+    "salmonella": {"minimum_length": 4300000, "maximum_length": 5300000, "max_contigs": 500},
+    "ecoli": {"minimum_length": 4500000, "maximum_length": 5900000, "max_contigs": 1000},
+    "listeria": {"minimum_length": 2700000, "maximum_length": 3200000, "max_contigs": 500},
+    "campylobacter": {"minimum_length": 1500000, "maximum_length": 1900000, "max_contigs": 500},
+    "cronobacter": {"minimum_length": 4000000, "maximum_length": 5000000, "max_contigs": 500}
+  }
+}

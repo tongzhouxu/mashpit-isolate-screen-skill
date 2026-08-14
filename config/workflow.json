@@ -1,0 +1,32 @@
+{
+  "skill_version": "1.0.0",
+  "workflow_version": "1.1.0",
+  "container_image": "ghcr.io/example/mashpit-isolate-screen:1.0.0",
+  "container_digest": "SET_AT_RELEASE",
+  "tools": {
+    "fastp": "0.23.4",
+    "skesa": "2.5.1",
+    "quast": "5.3.0",
+    "mlst": "2.35.0",
+    "sourmash": "4.8.14",
+    "mashpit": "git-538d3421302fe6dd129780605b8ff5dedbf4c046c"
+  },
+  "assembly": {
+    "fastp_args": ["--detect_adapter_for_pe", "--length_required", "50"],
+    "skesa_args": ["--cores", "0", "--memory", "16"],
+    "quast_args": ["--min-contig", "500", "--threads", "2"]
+  },
+  "databases": [
+    {"name": "salmonella", "organism_key": "salmonella", "organism": "Salmonella"},
+    {"name": "ecoli", "organism_key": "ecoli", "organism": "Escherichia coli"},
+    {"name": "listeria", "organism_key": "listeria", "organism": "Listeria"},
+    {"name": "campylobacter", "organism_key": "campylobacter", "organism": "Campylobacter"},
+    {"name": "cronobacter", "organism_key": "cronobacter", "organism": "Cronobacter"}
+  ],
+  "mashpit": {
+    "profile": "default-v1",
+    "number": 200,
+    "threshold": 0.85,
+    "tie_tolerance_hashes": 2
+  }
+}

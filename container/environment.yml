@@ -1,0 +1,14 @@
+name: mashpit-isolate-screen
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11.10
+  - fastp=0.23.4
+  - skesa=2.5.1
+  - quast=5.3.0
+  - mlst=2.35.0
+  - sourmash=4.8.14
+  - pip=24.2
+  - pip:
+      - mashpit @ https://github.com/tongzhouxu/mashpit/archive/538d3421302fe6dd129780605b8ff5dedbf4c046c.tar.gz

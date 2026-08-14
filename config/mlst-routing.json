@@ -1,0 +1,24 @@
+{
+  "mlst_version": "2.35.0",
+  "database_source": "PubMLST schemes bundled with tseemann/mlst 2.35.0",
+  "accepted_statuses": ["PERFECT", "NOVEL", "OK"],
+  "warning_statuses": ["MISSING"],
+  "rejected_statuses": ["NONE", "MIXED", "BAD"],
+  "schemes": {
+    "senterica": "salmonella",
+    "ecoli": "ecoli",
+    "ecoli_2": "ecoli",
+    "lmonocytogenes": "listeria",
+    "campylobacter": "campylobacter",
+    "cconcisus": "campylobacter",
+    "cfetus": "campylobacter",
+    "chelveticus": "campylobacter",
+    "chyointestinalis": "campylobacter",
+    "cinsulaenigrae": "campylobacter",
+    "clanienae": "campylobacter",
+    "clari": "campylobacter",
+    "csputorum": "campylobacter",
+    "cupsaliensis": "campylobacter",
+    "cronobacter": "cronobacter"
+  }
+}

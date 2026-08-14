@@ -1,0 +1,215 @@
+from __future__ import annotations
+
+import csv
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from collect_provenance import collect
+from classify_with_mlst import interpret_mlst, parse_mlst_csv, route_for_organism
+from common import WorkflowError
+from inspect_input import inspect
+from parse_mashpit_results import interpret, load_candidates
+from run_assembly_workflow import run_workflow
+from run_mashpit import run_mashpit, validate_database
+from screen_isolate import screen
+from validate_assembly import assess
+from validate_fastq import validate_pair
+
+
+class InputAndQcTests(unittest.TestCase):
+    def test_detects_assembly_and_fastq_pair(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assembly = root / "sample.fna"
+            assembly.write_text(">a\nACGT\n", encoding="utf-8")
+            self.assertEqual(inspect([assembly])["input_type"], "assembly")
+            r1 = root / "sample_R1.fastq"
+            r2 = root / "sample_R2.fastq"
+            record1 = "@read/1\nACGT\n+\nIIII\n"
+            record2 = "@read/2\nTGCA\n+\nIIII\n"
+            r1.write_text(record1, encoding="ascii")
+            r2.write_text(record2, encoding="ascii")
+            self.assertEqual(inspect([r2, r1])["input_type"], "illumina_paired_fastq")
+            self.assertEqual(validate_pair(r1, r2)["status"], "PASS")
+
+    def test_rejects_corrupt_fastq(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            r1 = root / "sample_R1.fastq"
+            r2 = root / "sample_R2.fastq"
+            r1.write_text("@read/1\nACGT\n+\nIII\n", encoding="ascii")
+            r2.write_text("@read/2\nACGT\n+\nIIII\n", encoding="ascii")
+            self.assertEqual(validate_pair(r1, r2)["status"], "FAIL")
+
+    def test_supported_organism_length_policies(self):
+        cases = {
+            "salmonella": 4_700_000,
+            "ecoli": 5_000_000,
+            "listeria": 2_900_000,
+            "campylobacter": 1_700_000,
+            "cronobacter": 4_500_000,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "assembly.fna"
+            for organism, length in cases.items():
+                with self.subTest(organism=organism):
+                    path.write_text(">contig\n" + "A" * length + "\n", encoding="ascii")
+                    self.assertEqual(assess(path, organism)["status"], "PASS")
+
+    def test_rejects_corrupt_and_poor_assembly(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            corrupt = root / "corrupt.fna"
+            corrupt.write_text("not-a-header\nACGTX\n", encoding="ascii")
+            self.assertEqual(assess(corrupt)["status"], "FAIL")
+            poor = root / "poor.fna"
+            poor.write_text("".join(f">c{i}\n" + "A" * 2000 + "\n" for i in range(600)), encoding="ascii")
+            result = assess(poor)
+            self.assertEqual(result["status"], "FAIL")
+            self.assertTrue(any("N50" in reason for reason in result["failures"]))
+
+
+class MashpitParsingTests(unittest.TestCase):
+    def write_candidates(self, path: Path, rows: list[dict]) -> None:
+        fields = ["PDS_acc", "best_similarity_score", "near_top"]
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def test_clear_mashpit_match(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "sample_cluster_candidates.csv"
+            self.write_candidates(path, [
+                {"PDS_acc": "PDS0001", "best_similarity_score": "0.991", "near_top": "True"},
+                {"PDS_acc": "PDS0002", "best_similarity_score": "0.940", "near_top": "False"},
+            ])
+            result = interpret(load_candidates(path))
+            self.assertEqual(result["status"], "MATCH")
+            self.assertEqual(result["best_candidate"]["cluster"], "PDS0001")
+            self.assertEqual(result["screening_result"], "Top-ranked candidate")
+
+    def test_ambiguous_mashpit_match(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "sample_cluster_candidates.csv"
+            self.write_candidates(path, [
+                {"PDS_acc": "PDS0001", "best_similarity_score": "0.991", "near_top": "True"},
+                {"PDS_acc": "PDS0002", "best_similarity_score": "0.990", "near_top": "True"},
+            ])
+            result = interpret(load_candidates(path))
+            self.assertEqual(result["status"], "AMBIGUOUS")
+            self.assertTrue(result["ambiguous"])
+
+
+class MlstRoutingTests(unittest.TestCase):
+    def mlst_row(self, scheme="senterica", status="PERFECT"):
+        return {
+            "FILE": "sample.fna", "SCHEME": scheme, "ST": "11",
+            "STATUS": status, "SCORE": "100", "ALLELES": "aroC(1)",
+        }
+
+    def test_routes_supported_pubmlst_schemes(self):
+        cases = {
+            "senterica": "salmonella", "ecoli": "ecoli",
+            "lmonocytogenes": "listeria", "campylobacter": "campylobacter",
+            "cronobacter": "cronobacter",
+        }
+        for scheme, expected in cases.items():
+            with self.subTest(scheme=scheme):
+                result = interpret_mlst(self.mlst_row(scheme))
+                self.assertEqual(result["status"], "SUPPORTED")
+                self.assertEqual(result["database_name"], expected)
+
+    def test_unsupported_and_uncertain_mlst_results(self):
+        self.assertEqual(interpret_mlst(self.mlst_row("kpneumoniae"))["status"], "UNSUPPORTED")
+        self.assertEqual(interpret_mlst(self.mlst_row("senterica", "MIXED"))["status"], "UNCERTAIN")
+        warning = interpret_mlst(self.mlst_row("senterica", "MISSING"))
+        self.assertEqual(warning["status"], "SUPPORTED")
+        self.assertTrue(warning["warnings"])
+
+    def test_parse_pinned_mlst_csv_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "mlst.csv"
+            path.write_text(
+                "FILE,SCHEME,ST,STATUS,SCORE,ALLELES\n"
+                "sample.fna,ecoli,10,PERFECT,100,adk(1);fumC(2)\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(parse_mlst_csv(path)["SCHEME"], "ecoli")
+
+    def test_user_organism_selects_database_without_classification(self):
+        for organism in ("salmonella", "ecoli", "listeria", "campylobacter", "cronobacter"):
+            with self.subTest(organism=organism):
+                route = route_for_organism(organism)
+                self.assertEqual(route["source"], "user")
+                self.assertEqual(route["database_name"], organism)
+
+
+class FailureAndProvenanceTests(unittest.TestCase):
+    def test_missing_database(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(WorkflowError):
+                validate_database(Path(temporary) / "missing", "salmonella")
+
+    @patch("run_mashpit.validate_database")
+    @patch("run_mashpit.require_executable", return_value="/usr/bin/mashpit")
+    @patch("run_mashpit.run_logged", return_value=1)
+    def test_mashpit_runtime_failure(self, _run, _executable, database):
+        database.return_value = {"name": "salmonella", "version": "test"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assembly = root / "sample.fna"
+            assembly.write_text(">a\nACGT\n", encoding="ascii")
+            with self.assertRaises(WorkflowError):
+                run_mashpit(assembly, root / "db", "salmonella", root / "output")
+
+    @patch("run_mashpit.validate_database")
+    @patch("run_mashpit.require_executable", return_value="/usr/bin/mashpit")
+    @patch("run_mashpit.run_logged", return_value=0)
+    def test_fixed_mashpit_invocation(self, logged, _executable, database):
+        database.return_value = {
+            "name": "salmonella",
+            "version": "test",
+            "mashpit_database_settings": {"hash_number": 1000, "kmer_size": 31},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assembly = root / "sample.fna"
+            assembly.write_text(">a\nACGT\n", encoding="ascii")
+            result = run_mashpit(assembly, root / "db", "salmonella", root / "output")
+            command = logged.call_args.args[0]
+            self.assertEqual(command[:2], ["/usr/bin/mashpit", "query"])
+            self.assertEqual(command[-6:], [
+                "--number", "200", "--threshold", "0.85", "--tie-tolerance-hashes", "2"
+            ])
+            self.assertEqual(result["status"], "PASS")
+
+    @patch("run_assembly_workflow.validate_pair", return_value={"status": "PASS", "read_pairs": 1})
+    @patch("run_assembly_workflow.require_executable", side_effect=lambda name: name)
+    @patch("run_assembly_workflow.run_logged", return_value=1)
+    def test_failed_assembly_workflow(self, _run, _executable, _validate):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaises(WorkflowError):
+                run_workflow(root / "r1.fastq", root / "r2.fastq", root / "assembly")
+
+    @patch("collect_provenance.executable_version", return_value={"available": False})
+    def test_provenance_contains_checksums_and_commit(self, _version):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "sample.fna"
+            path.write_text(">a\nACGT\n", encoding="ascii")
+            value = collect([path], path, {"name": "salmonella"}, [["mashpit", "query"]])
+            self.assertEqual(len(value["inputs"][0]["sha256"]), 64)
+            self.assertIn("538d342", value["pinned_tool_versions"]["mashpit"])
+
+
+if __name__ == "__main__":
+    unittest.main()
