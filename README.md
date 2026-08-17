@@ -2,13 +2,88 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](LICENSE)
 
-A local, deterministic **agent skill** (works with Claude Code, OpenAI Codex, or any tool-calling agent that reads `SKILL.md`) for screening a bacterial isolate — raw paired Illumina reads or an assembly — against [Mashpit](https://github.com/tongzhouxu/mashpit), a MinHash-sketch database of NCBI Pathogen Detection SNP clusters. Optionally confirms a Mashpit candidate at true SNP resolution with [ska2](https://github.com/bacpop/ska.rust).
+This screens a bacterial isolate (a genome you sequenced) against public outbreak-cluster data, to tell you which known cluster of related bacteria it's most similar to. You do not need to know how to code to use it — you need to install two ordinary applications, then just describe what you want in plain English to an AI coding assistant (Claude Code or Codex), and it does the rest. That's what this page walks you through first. If you're comfortable with the command line already, skip to [Manual setup](#manual-setup) below.
 
-Every command, threshold, and parameter is fixed in version-controlled config (`config/*.json`) — the invoking LLM only runs one script and reports the result; it never constructs bioinformatics commands or invents a cutoff. See [SKILL.md](SKILL.md) for the full agent-facing contract.
+## Quick start (no coding experience needed)
 
-Supports `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, and `cronobacter`. Nothing is uploaded during a screen — the query stays on your machine. Mashpit is installed from a pinned upstream commit (`538d3421302fe6dd129780605b8ff5dedbf4c046c`), not the older published PyPI release.
+### What you'll need
 
-## Setup
+- A Mac, Windows (with WSL2), or Linux computer with at least **10GB of free disk space** and a decent internet connection (you'll be downloading a few GB).
+- A genome file for the bacterial isolate you want to screen: either one assembled genome (a `.fasta`/`.fna` file), or two raw paired-end Illumina read files (commonly named something like `sample_R1.fastq.gz` and `sample_R2.fastq.gz`). If you don't have one yet and just want to try the process, ask the assistant in Step 3 below to fetch a public example genome for you from NCBI instead of using your own file.
+- Roughly 15-40 minutes for one-time setup (mostly waiting for downloads), then a few minutes per genome you screen after that.
+
+### Step 1 — Install Docker Desktop
+
+This is the program that actually runs the analysis in an isolated, reproducible way. It's a normal application, installed like any other:
+
+1. Go to [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) and download it for your computer.
+2. Install it the way you'd install any app (double-click, follow the prompts).
+3. Open the Docker Desktop app once and leave it running in the background. You'll know it worked if you see a little whale icon in your menu bar / system tray. It needs to stay running any time you use this skill.
+
+### Step 2 — Install Claude Code or Codex
+
+This is the AI assistant that will read your instructions, download things, and run the analysis for you — so you don't have to type any of the technical commands yourself.
+
+- **Claude Code**: see [claude.com/claude-code](https://claude.com/claude-code) for the current install instructions for your computer.
+- **Codex**: see OpenAI's current Codex documentation for install instructions.
+
+Either one works equally well with this skill. Once installed, open it (this usually means: open the Terminal app on your computer, type the assistant's name, e.g. `claude`, and press Enter — the install instructions above will confirm the exact command for your setup) so you have a chat window open with it.
+
+### Step 3 — Ask it to set everything up
+
+Copy the box below, paste it into your chat with Claude Code or Codex, replace `[ORGANISM]` with whichever of `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, or `cronobacter` matches your sample (if you're not sure, just pick `cronobacter` for a first try — its database is much smaller and faster to download), and send it:
+
+```
+Please set up the mashpit-isolate-screen-skill for me:
+
+1. Clone https://github.com/tongzhouxu/mashpit-isolate-screen-skill
+   into a folder on my computer.
+2. Read that repository's README.md and follow its "Manual setup"
+   instructions to pull the published Docker image, and to download
+   and checksum-verify the [ORGANISM] database from its GitHub
+   Release into ~/.mashpit/databases/.
+
+Explain each step briefly as you go, and tell me clearly once
+everything is downloaded and ready.
+```
+
+It will likely pause partway through to ask your permission before running certain commands (downloading files, running Docker) — that's normal and expected; read what it says it's about to do, and approve it if it matches the steps above.
+
+### Step 4 — Ask it to screen your genome
+
+Once setup is done, copy this box, fill in the path to your genome file(s) and the organism, and send it:
+
+```
+Please screen this genome using the mashpit-isolate-screen-skill you
+just set up: [PATH TO YOUR .fasta FILE, OR YOUR TWO .fastq.gz FILES]
+
+Organism: [ORGANISM]
+
+Once it finishes, open the report.md file it produces and explain
+the result to me in plain English — in particular, tell me which
+cluster it's closest to, how confident that is, and what you'd
+recommend I do next.
+```
+
+A first run typically takes a few minutes. If you don't know the organism ahead of time, say so instead of naming one — it can auto-detect it from your genome, it'll just take slightly longer.
+
+### If something goes wrong
+
+- **"Cannot connect to the Docker daemon"** — Docker Desktop isn't running. Reopen the Docker Desktop app and wait for the whale icon to stop animating, then try again.
+- **Running out of disk space** — each organism's database ranges from ~3MB (cronobacter) to ~530MB (ecoli_shigella) compressed; you only need the one(s) you're actually screening against, not all five.
+- **Anything else** — paste the error message back to the assistant and ask it to diagnose and fix it; that's exactly the kind of thing it's good at.
+
+## What this actually does
+
+Screens a bacterial isolate — raw paired Illumina reads or an assembly — against [Mashpit](https://github.com/tongzhouxu/mashpit), a MinHash-sketch database of NCBI Pathogen Detection SNP clusters, and optionally confirms a candidate at true SNP resolution with [ska2](https://github.com/bacpop/ska.rust). It tells you which known cluster of bacteria your sample most resembles — useful for narrowing down a possible outbreak connection, though it is a screening tool, not proof of one (see [references/limitations.md](references/limitations.md)).
+
+Every command, threshold, and parameter it runs is fixed in version-controlled config (`config/*.json`) — the AI assistant only runs one script and reports the result back to you; it never invents a bioinformatics command or a cutoff on its own. See [SKILL.md](SKILL.md) for the full technical contract it follows.
+
+Supports `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, and `cronobacter`. Nothing is uploaded during a screen — your genome stays on your own computer. Mashpit is installed from a pinned upstream commit (`538d3421302fe6dd129780605b8ff5dedbf4c046c`), not the older published PyPI release.
+
+## Manual setup
+
+For anyone who'd rather run the commands themselves instead of asking an assistant to.
 
 You need two things: the container image, and a Mashpit database for at least one organism.
 
@@ -67,18 +142,9 @@ Add `--snp-resolve` to also download the relevant representative genomes from NC
 
 Three files land in the output directory:
 
-- **`report.md`** — a plain-language summary for a non-technical reader: organism determination, Mashpit's candidate clusters and scores plus its own Mash-based tree, and (with `--snp-resolve`) the ska2 SNP tables, confidence statement, and SNP tree — both trees rendered as PNGs with the query highlighted.
+- **`report.md`** — a plain-language summary for a non-technical reader: organism determination, read QC when the input was raw reads, Mashpit's candidate clusters and scores plus its own Mash-based tree, and (with `--snp-resolve`) the ska2 SNP tables, confidence statement, and SNP tree — both trees rendered as PNGs with the query highlighted.
 - **`result.json`** — the structured, authoritative result. Use `status`, `stop_reason`, and `user_summary`.
 - **`provenance.json`** — checksums, pinned tool versions, and every command actually run, for reproducibility.
-
-## Use it without writing any code
-
-If you're driving this through an agentic coding tool rather than the CLI directly, no code is required — you just ask in plain language and the agent invokes the pipeline for you, following [SKILL.md](SKILL.md)'s instructions:
-
-- **Claude Code**: drop this repo (or a copy of it) into a skills directory Claude Code scans (project-level `.claude/skills/` or your user-level skills directory) and ask it to screen a genome in chat.
-- **OpenAI Codex** (or any Codex-style agent): [agents/openai.yaml](agents/openai.yaml) already declares this skill's default invocation prompt.
-
-What you still can't skip, regardless of which agent triggers it: Docker installed and a database downloaded locally (see Setup above) on whatever machine actually runs the agent's shell commands. A plain chat interface with no shell/Docker access (e.g. the base claude.ai chat, without a code-execution or agentic-coding capability) can't run this — it needs an agent that can actually execute local commands.
 
 ## Test without biological tools or databases
 
@@ -86,7 +152,7 @@ What you still can't skip, regardless of which agent triggers it: Docker install
 PYTHONPYCACHEPREFIX=/tmp/mashpit_pycache python3 -m unittest discover -s tests -v
 ```
 
-These unit tests mock external bioinformatics execution and don't need Docker, Mashpit, or a real database. A real end-to-end run additionally needs the container and at least one downloaded database, per Setup above.
+These unit tests mock external bioinformatics execution and don't need Docker, Mashpit, or a real database. A real end-to-end run additionally needs the container and at least one downloaded database, per Manual setup above.
 
 ## Reference docs
 
