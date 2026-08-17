@@ -1,30 +1,47 @@
-# Mashpit Isolate Screen
+# Mashpit Isolate Screen Skill
 
-A local, deterministic Codex Skill for screening bacterial isolate assemblies or paired Illumina reads with Mashpit.
+A local, deterministic **agent skill** (works with Claude Code, OpenAI Codex, or any tool-calling agent that reads `SKILL.md`) for screening a bacterial isolate — raw paired Illumina reads or an assembly — against [Mashpit](https://github.com/tongzhouxu/mashpit), a MinHash-sketch database of NCBI Pathogen Detection SNP clusters. Optionally confirms a Mashpit candidate at true SNP resolution with [ska2](https://github.com/bacpop/ska.rust).
 
-## Routing behavior
+Every command, threshold, and parameter is fixed in version-controlled config (`config/*.json`) — the invoking LLM only runs one script and reports the result; it never constructs bioinformatics commands or invents a cutoff. See [SKILL.md](SKILL.md) for the full agent-facing contract.
 
-- With `--organism`: select that organism's local Mashpit database directly.
-- Without `--organism`: run local `mlst` 2.35.0 against its bundled PubMLST schemes, map the selected scheme to a supported group, then query only that Mashpit database.
-- Supported keys: `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, and `cronobacter`.
+Supports `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, and `cronobacter`. Nothing is uploaded during a screen — the query stays on your machine. Mashpit is installed from a pinned upstream commit (`538d3421302fe6dd129780605b8ff5dedbf4c046c`), not the older published PyPI release.
 
-No assembly is uploaded. Mashpit is installed from upstream commit `538d3421302fe6dd129780605b8ff5dedbf4c046c`.
+## Setup
 
-## Build
+You need two things: the container image, and a Mashpit database for at least one organism.
 
-Start Docker Desktop, then from the directory containing this repository run:
+**1. Get the image** — either pull the pre-built one:
 
 ```bash
-docker build \
-  --platform linux/amd64 \
-  --tag mashpit-isolate-screen:local \
-  --file mashpit-isolate-screen/container/Dockerfile \
-  mashpit-isolate-screen
+docker pull ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest
+docker tag ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest mashpit-isolate-screen:local
 ```
 
-`--platform linux/amd64` is required on Apple Silicon: `quast=5.3.0` has no native `linux/arm64` build compatible with the pinned Python 3.11, so a native-arch build fails to resolve. `linux/amd64` runs under emulation on Apple Silicon but resolves and runs correctly.
+or build it yourself:
 
-## Run with a known organism
+```bash
+docker build --platform linux/amd64 --tag mashpit-isolate-screen:local --file container/Dockerfile .
+```
+
+`--platform linux/amd64` is required on Apple Silicon: `quast=5.3.0` has no native `linux/arm64` build compatible with the pinned Python 3.11. It runs fine there under emulation.
+
+**2. Get a database** — download the pre-built ones from [Releases](../../releases/tag/databases-v1):
+
+```bash
+mkdir -p ~/.mashpit/databases && cd ~/.mashpit/databases
+for org in salmonella ecoli_shigella listeria campylobacter cronobacter; do
+  curl -LO "https://github.com/tongzhouxu/mashpit-isolate-screen-skill/releases/download/databases-v1/${org}.tar.gz"
+done
+curl -LO https://github.com/tongzhouxu/mashpit-isolate-screen-skill/releases/download/databases-v1/checksums.sha256.txt
+shasum -a 256 -c checksums.sha256.txt   # verify before extracting
+for f in *.tar.gz; do tar -xzf "$f"; done
+```
+
+You only need the organism(s) you actually plan to screen against — each is independent. `screen_isolate.py` additionally verifies a per-file checksum recorded in each organism's `database.json` on every run, so a corrupted or tampered database is caught automatically, not just at download time.
+
+Database creation and updating are out of scope for this skill; see [mashpit](https://github.com/tongzhouxu/mashpit) itself for that.
+
+## Run a screen
 
 ```bash
 docker run --rm \
@@ -38,19 +55,44 @@ docker run --rm \
   --output /results/sample-screen
 ```
 
-Omit `--organism salmonella` to invoke local MLST auto-detection. For paired reads, replace the assembly argument with both paths, for example `/data/sample_R1.fastq.gz /data/sample_R2.fastq.gz`.
+- Input is one assembly (`.fa`/`.fasta`/`.fna`), or two paired-end FASTQ files — replace the assembly argument with both paths (e.g. `/data/sample_R1.fastq.gz /data/sample_R2.fastq.gz`) to run the fixed fastp → SKESA → QUAST assembly workflow first.
+- Omit `--organism` to auto-detect it with local `mlst` against its bundled PubMLST schemes instead of asserting it.
+- The output directory must not already exist — nothing gets silently overwritten.
 
-The output directory must not already exist. Review `result.json` first and retain `provenance.json` plus the logs.
+Add `--snp-resolve` to also download the relevant representative genomes from NCBI and compute exact pairwise SNP distances with ska2 once a Mashpit candidate is found — a Neighbor-Joining tree, a per-cluster distance summary, and a confidence comparison between the nearest and next-nearest cluster. This is the only step that reaches out to the network (for public reference genomes; the query itself is never uploaded), so it's opt-in. See [references/snp-resolution.md](references/snp-resolution.md).
 
-## Refine a candidate with ska2 SNP distances (optional)
+### Reading the result
 
-Add `--snp-resolve` to the same command to, once a Mashpit candidate is found, download the relevant representative genomes from NCBI and compute pairwise SNP distances with ska2 against the query. Unlike the rest of the screen, this step reaches out to NCBI (for public reference genomes only — the query is never uploaded), so it is opt-in rather than automatic. See [references/snp-resolution.md](mashpit-isolate-screen/references/snp-resolution.md) for the selection and interpretation rules.
+Three files land in the output directory:
+
+- **`report.md`** — a plain-language summary for a non-technical reader: organism determination, Mashpit's candidate clusters and scores plus its own Mash-based tree, and (with `--snp-resolve`) the ska2 SNP tables, confidence statement, and SNP tree — both trees rendered as PNGs with the query highlighted.
+- **`result.json`** — the structured, authoritative result. Use `status`, `stop_reason`, and `user_summary`.
+- **`provenance.json`** — checksums, pinned tool versions, and every command actually run, for reproducibility.
+
+## Use it without writing any code
+
+If you're driving this through an agentic coding tool rather than the CLI directly, no code is required — you just ask in plain language and the agent invokes the pipeline for you, following [SKILL.md](SKILL.md)'s instructions:
+
+- **Claude Code**: drop this repo (or a copy of it) into a skills directory Claude Code scans (project-level `.claude/skills/` or your user-level skills directory) and ask it to screen a genome in chat.
+- **OpenAI Codex** (or any Codex-style agent): [agents/openai.yaml](agents/openai.yaml) already declares this skill's default invocation prompt.
+
+What you still can't skip, regardless of which agent triggers it: Docker installed and a database downloaded locally (see Setup above) on whatever machine actually runs the agent's shell commands. A plain chat interface with no shell/Docker access (e.g. the base claude.ai chat, without a code-execution or agentic-coding capability) can't run this — it needs an agent that can actually execute local commands.
 
 ## Test without biological tools or databases
 
 ```bash
-PYTHONPYCACHEPREFIX=/tmp/mashpit_pycache \
-python3 -m unittest discover -s mashpit-isolate-screen/tests -v
+PYTHONPYCACHEPREFIX=/tmp/mashpit_pycache python3 -m unittest discover -s tests -v
 ```
 
-These unit tests mock external bioinformatics execution. A real end-to-end test additionally requires one supported assembly and its corresponding Mashpit `.db`, `.sig`, and `database.json` files.
+These unit tests mock external bioinformatics execution and don't need Docker, Mashpit, or a real database. A real end-to-end run additionally needs the container and at least one downloaded database, per Setup above.
+
+## Reference docs
+
+- [SKILL.md](SKILL.md) — the agent-facing contract: when to run what, how to report results
+- [references/setup.md](references/setup.md) — container/database contract in full
+- [references/workflow.md](references/workflow.md) — the fixed pipeline, stage by stage
+- [references/database-routing.md](references/database-routing.md) — organism routing rules
+- [references/qc-policy.md](references/qc-policy.md) — QC thresholds and their evidence basis
+- [references/mashpit-interpretation.md](references/mashpit-interpretation.md) — how a Mashpit result is labeled
+- [references/snp-resolution.md](references/snp-resolution.md) — the optional ska2 SNP-resolution step
+- [references/limitations.md](references/limitations.md) — scope and scientific limitations
