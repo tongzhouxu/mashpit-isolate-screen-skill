@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+- Added `LICENSE` (GPL v2, matching Mashpit's own license verbatim) — the repo had none before, which meant it was "all rights reserved" by default despite being public. `CITATION.cff` now declares `license: GPL-2.0-only` to match.
+
 ## [1.0.0] - 2026-08-17
 
 Initial release.

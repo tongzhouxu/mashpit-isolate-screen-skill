@@ -1,5 +1,7 @@
 # Mashpit Isolate Screen Skill
 
+[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](LICENSE)
+
 A local, deterministic **agent skill** (works with Claude Code, OpenAI Codex, or any tool-calling agent that reads `SKILL.md`) for screening a bacterial isolate — raw paired Illumina reads or an assembly — against [Mashpit](https://github.com/tongzhouxu/mashpit), a MinHash-sketch database of NCBI Pathogen Detection SNP clusters. Optionally confirms a Mashpit candidate at true SNP resolution with [ska2](https://github.com/bacpop/ska.rust).
 
 Every command, threshold, and parameter is fixed in version-controlled config (`config/*.json`) — the invoking LLM only runs one script and reports the result; it never constructs bioinformatics commands or invents a cutoff. See [SKILL.md](SKILL.md) for the full agent-facing contract.

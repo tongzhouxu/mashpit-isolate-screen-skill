@@ -9,6 +9,7 @@ authors:
   given-names: Tongzhou
   orcid: "https://orcid.org/0000-0002-3829-8688"
 repository-code: "https://github.com/tongzhouxu/mashpit-isolate-screen-skill"
+license: GPL-2.0-only
 version: "1.0.0"
 date-released: "2026-08-17"
 references:
