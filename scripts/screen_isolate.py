@@ -191,12 +191,18 @@ def screen(
         database_metadata = mashpit_run["database"]
         result["database"] = database_metadata
         candidate_file = locate_candidate_file(Path(mashpit_run["output_directory"]))
-        parsed = interpret(load_candidates(candidate_file))
+        mashpit_profile = load_json(CONFIG_DIR / "workflow.json")["mashpit"]
+        parsed = interpret(load_candidates(candidate_file), threshold=mashpit_profile["threshold"])
         parsed["source_file"] = str(candidate_file)
         write_json(output_dir / "mashpit_result.json", parsed)
         result["mashpit_result"] = parsed
         result["warnings"].extend(parsed.get("warnings", []))
-        if snp_resolve and parsed.get("best_candidate"):
+        if snp_resolve and parsed.get("below_threshold"):
+            result["warnings"].append(
+                "SNP resolution skipped: Mashpit's top hit is below its own query threshold, "
+                "so there is no real candidate to resolve."
+            )
+        elif snp_resolve and parsed.get("best_candidate"):
             try:
                 snp_outcome = run_snp_resolution(
                     Path(mashpit_run["output_directory"]), assembly,

@@ -100,6 +100,22 @@ class MashpitParsingTests(unittest.TestCase):
             self.assertEqual(result["status"], "MATCH")
             self.assertEqual(result["best_candidate"]["cluster"], "PDS0001")
             self.assertEqual(result["screening_result"], "Top-ranked candidate")
+            self.assertFalse(result["below_threshold"])
+
+    def test_below_threshold_top_hit_is_flagged_even_when_unambiguous(self):
+        # Observed for real: a cross-genus query still produces a near_top-flagged
+        # "candidate" at near-zero score, since --number/--tie-tolerance-hashes group
+        # the top hits regardless of absolute score; --threshold only gates local tree
+        # construction. The parser must catch this independently of ambiguity.
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "sample_cluster_candidates.csv"
+            self.write_candidates(path, [
+                {"PDS_acc": "PDS0001", "best_similarity_score": "0.007", "near_top": "True"},
+            ])
+            result = interpret(load_candidates(path), threshold=0.85)
+            self.assertFalse(result["ambiguous"])
+            self.assertTrue(result["below_threshold"])
+            self.assertTrue(any("below its own query threshold" in warning for warning in result["warnings"]))
 
     def test_ambiguous_mashpit_match(self):
         with tempfile.TemporaryDirectory() as temporary:

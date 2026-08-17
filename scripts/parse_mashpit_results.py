@@ -87,22 +87,33 @@ def best_representative_score(output_dir: Path) -> float:
     return max(scores)
 
 
-def interpret(candidates: list[dict[str, Any]]) -> dict:
+def interpret(candidates: list[dict[str, Any]], threshold: float | None = None) -> dict:
     if not candidates:
         return {
             "status": "NO_MATCH",
             "best_candidate": None,
             "alternative_candidates": [],
             "ambiguous": False,
+            "below_threshold": False,
             "screening_result": "No candidate",
-            "warnings": ["Mashpit returned no candidate above its fixed query threshold."],
+            "warnings": ["Mashpit returned no candidate; there was no usable sketch overlap with the query."],
         }
     best = candidates[0]
     tied = [item for item in candidates[1:] if item.get("near_top")]
     ambiguous = bool(tied)
+    # --number/--tie-tolerance-hashes return and group the top hits regardless of how low
+    # their absolute score is; --threshold only gates local tree construction (see
+    # references/mashpit-interpretation.md). A "near-top"/single-cluster result can
+    # therefore still be noise-level similarity, so that has to be checked separately.
+    below_threshold = threshold is not None and best["score"] < threshold
     warnings = []
     if ambiguous:
         warnings.append("Mashpit marks multiple SNP clusters as near-top within sketch resolution.")
+    if below_threshold:
+        warnings.append(
+            f"Mashpit's top hit (score {best['score']:.3f}) is below its own query threshold "
+            f"({threshold}); treat this as noise-level sketch similarity, not a real candidate."
+        )
     return {
         "status": "AMBIGUOUS" if ambiguous else "MATCH",
         "best_candidate": {"cluster": best["cluster"], "score": best["score"]},
@@ -110,6 +121,7 @@ def interpret(candidates: list[dict[str, Any]]) -> dict:
             {"cluster": item["cluster"], "score": item["score"]} for item in candidates[1:6]
         ],
         "ambiguous": ambiguous,
+        "below_threshold": below_threshold,
         "screening_result": "Ambiguous top candidates" if ambiguous else "Top-ranked candidate",
         "warnings": warnings,
     }
@@ -119,11 +131,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input")
     parser.add_argument("--mashpit-output-dir")
+    parser.add_argument("--threshold", type=float)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     try:
         source = Path(args.input) if args.input else locate_candidate_file(Path(args.mashpit_output_dir))
-        result = interpret(load_candidates(source))
+        result = interpret(load_candidates(source), threshold=args.threshold)
         result["source_file"] = str(source)
     except (WorkflowError, OSError, ValueError, json.JSONDecodeError) as error:
         result = {"status": "ERROR", "error": str(error), "best_candidate": None, "ambiguous": True}
