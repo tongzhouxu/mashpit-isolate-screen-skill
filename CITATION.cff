@@ -1,0 +1,43 @@
+cff-version: "1.2.0"
+title: "Mashpit Isolate Screen Skill"
+message: >-
+  If you use this software, please cite it as below. If you use it to query
+  or build a Mashpit database, also cite Mashpit itself (see references).
+type: software
+authors:
+- family-names: Xu
+  given-names: Tongzhou
+  orcid: "https://orcid.org/0000-0002-3829-8688"
+repository-code: "https://github.com/tongzhouxu/mashpit-isolate-screen-skill"
+version: "1.0.0"
+date-released: "2026-08-17"
+references:
+- type: software
+  title: "Mashpit"
+  repository-code: "https://github.com/tongzhouxu/mashpit"
+- type: article
+  title: "Mashpit: sketching out genomic epidemiology"
+  authors:
+  - family-names: Xu
+    given-names: Tongzhou
+    orcid: "https://orcid.org/0000-0002-3829-8688"
+  - family-names: Bakker
+    given-names: Henk C.
+    name-particle: den
+    orcid: "https://orcid.org/0000-0002-4086-1580"
+  - family-names: Deng
+    given-names: Xiangyu
+    orcid: "https://orcid.org/0000-0002-7251-2529"
+  - family-names: Katz
+    given-names: Lee S.
+    orcid: "https://orcid.org/0000-0002-2533-9161"
+  doi: 10.21105/joss.07306
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  issn: 2475-9066
+  issue: 104
+  volume: 9
+  start: 7306
+  date-published: 2024-12-17
+  url: "https://joss.theoj.org/papers/10.21105/joss.07306"

@@ -96,3 +96,5 @@ These unit tests mock external bioinformatics execution and don't need Docker, M
 - [references/mashpit-interpretation.md](references/mashpit-interpretation.md) — how a Mashpit result is labeled
 - [references/snp-resolution.md](references/snp-resolution.md) — the optional ska2 SNP-resolution step
 - [references/limitations.md](references/limitations.md) — scope and scientific limitations
+- [CHANGELOG.md](CHANGELOG.md) — release history
+- [CITATION.cff](CITATION.cff) — how to cite this skill and Mashpit itself

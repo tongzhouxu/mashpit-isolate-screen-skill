@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+
+## [1.0.0] - 2026-08-17
+
+Initial release.
+
+### Core screening pipeline
+
+- Deterministic, LLM-agnostic entrypoint (`scripts/screen_isolate.py`) accepting one FASTA/FNA assembly or a paired-end Illumina FASTQ pair.
+- Fixed read QC and assembly workflow: `fastp` → `SKESA` → `QUAST`, with a hard 20x estimated-coverage floor.
+- Broad and organism-specific assembly QC against evidence-based thresholds (`config/qc-policy.json`; see `references/qc-policy.md`).
+- Organism routing either by explicit `--organism` or local `mlst` auto-detection against its bundled PubMLST schemes (`references/database-routing.md`).
+- Fixed-profile Mashpit query (`--number 200 --threshold 0.85 --tie-tolerance-hashes 2`) against a pinned Mashpit commit (`538d3421302fe6dd129780605b8ff5dedbf4c046c`).
+- Structural, non-invented interpretation of Mashpit's result: top candidate, ambiguity (`near_top`), and a `below_threshold` flag catching the case where Mashpit's own top hit is noise-level (found via real testing: a cross-genus query still produced a nominal "candidate" at score 0.007).
+- Five supported organisms: `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, `cronobacter`. (`ecoli_shigella`, not `ecoli`, since the underlying PubMLST scheme genuinely can't distinguish the two genera.)
+
+### Optional SNP resolution (`--snp-resolve`)
+
+- Selects representative genomes from Mashpit's top cluster plus any `near_top` clusters, capped at 100 representatives per cluster / 100 genomes total (round-robin across clusters) so a cluster with hundreds or thousands of representatives can't turn into an unbounded ska2 run.
+- Downloads representatives from NCBI via one batched `datasets download` call, retried on failure.
+- Runs `ska2` (`ska build` / `ska distance`) for exact pairwise SNP distances between the query and every downloaded representative, and between representatives themselves.
+- Reports a per-cluster distance summary, a raw-ratio confidence comparison between the nearest and next-nearest cluster (no invented strength label), and a Neighbor-Joining tree (pure-Python implementation, verified against a hand-computed additive case) with tips labeled by cluster.
+- Renders both the ska2 SNP tree and Mashpit's own Mash-similarity tree to PNG, query highlighted, embedded in the report.
+
+### Reporting
+
+- `report.md`: a plain-language summary (organism determination, Mashpit's candidate clusters and scores, SNP tables/tree/confidence statement when `--snp-resolve` ran) for a reader who isn't going to open JSON.
+- `result.json` / `provenance.json`: structured result and full reproducibility record (checksums, pinned tool versions, every command run) as before.
+
+### Distribution
+
+- Pre-built, checksummed Mashpit databases for all five organisms published on the [`databases-v1`](../../releases/tag/databases-v1) release.
+- Container image published to `ghcr.io/tongzhouxu/mashpit-isolate-screen-skill` via GitHub Actions on version tags (`linux/amd64` only — `quast=5.3.0` has no `linux/arm64` build for the pinned Python 3.11).
+
+### Verification
+
+Validated end-to-end against real production Mashpit databases (Listeria, Salmonella, Cronobacter) with ground truth cross-referenced against NCBI Pathogen Detection's own isolate/cluster files (not just Mashpit self-consistency), including inside the actual published container. That process surfaced and fixed several real, pre-existing issues along the way: a `quast`/Python 3.11/`linux-arm64` build incompatibility, a missing C compiler blocking a pip dependency's build, a `sourmash`/`pkg_resources` break from an unpinned `setuptools`, and a provenance-collection bug that recorded a crashed tool's traceback as if it were a version string.
+
+36 unit tests, all mocking external bioinformatics execution (no Docker/database required to run them).
