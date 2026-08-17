@@ -17,6 +17,11 @@ from typing import Any
 
 TOP_N_GENOMES = 10
 
+INPUT_TYPE_LABELS = {
+    "assembly": "an existing genome assembly",
+    "illumina_paired_fastq": "raw paired-end Illumina reads",
+}
+
 
 def _mashpit_section(result: dict[str, Any]) -> list[str]:
     lines = ["## Step 2: Screened against the Mashpit database", ""]
@@ -159,8 +164,18 @@ def generate_report(result: dict[str, Any]) -> str:
         "",
         "## Step 1: Sample and organism",
         "",
-        f"Input type: {result.get('input_type', 'unknown')}.",
+        f"Input: {INPUT_TYPE_LABELS.get(result.get('input_type'), result.get('input_type', 'unknown'))}.",
     ]
+    read_qc = result.get("read_qc")
+    if read_qc:
+        coverage = read_qc.get("estimated_coverage")
+        q30 = read_qc.get("q30_fraction")
+        lines.append(
+            f"Read quality: **{read_qc['status']}** — "
+            + (f"{coverage:.0f}x estimated coverage" if coverage is not None else "coverage unavailable")
+            + (f", {q30:.1%} of bases at Q30 or better" if q30 is not None else "")
+            + f" ({read_qc.get('read_pairs_validated', 'unknown')} read pairs)."
+        )
     if result.get("assembly_qc"):
         qc = result["assembly_qc"]
         lines.append(f"Assembly quality check: **{qc['status']}**"
