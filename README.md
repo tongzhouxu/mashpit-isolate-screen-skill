@@ -16,10 +16,13 @@ Start Docker Desktop, then from the directory containing this repository run:
 
 ```bash
 docker build \
+  --platform linux/amd64 \
   --tag mashpit-isolate-screen:local \
   --file mashpit-isolate-screen/container/Dockerfile \
   mashpit-isolate-screen
 ```
+
+`--platform linux/amd64` is required on Apple Silicon: `quast=5.3.0` has no native `linux/arm64` build compatible with the pinned Python 3.11, so a native-arch build fails to resolve. `linux/amd64` runs under emulation on Apple Silicon but resolves and runs correctly.
 
 ## Run with a known organism
 

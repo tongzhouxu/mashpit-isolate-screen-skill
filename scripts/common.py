@@ -59,12 +59,22 @@ def executable_version(executable: str, args: Iterable[str] = ("--version",)) ->
             [resolved, *args], capture_output=True, text=True, timeout=30, check=False
         )
         text = (completed.stdout or completed.stderr).strip().splitlines()
-        return {
+        result = {
             "available": True,
             "version": text[0] if text else "unknown",
             "path": resolved,
             "returncode": completed.returncode,
         }
+        # A nonzero exit means the tool itself failed rather than printing a
+        # version; the first output line is then a traceback/error fragment,
+        # not a version string, so don't record it as one (observed for real:
+        # sourmash 4.6.1's own `--version` hits an unrelated upstream argparse
+        # bug - duplicate `sbt_combine` subparser registration - even though
+        # mashpit's actual use of sourmash as a library is unaffected).
+        if completed.returncode != 0:
+            result["version"] = None
+            result["error"] = "\n".join(text[:3]) if text else "no output"
+        return result
     except (OSError, subprocess.TimeoutExpired) as error:
         return {"available": True, "version": None, "path": resolved, "error": str(error)}
 

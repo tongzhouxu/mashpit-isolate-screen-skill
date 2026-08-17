@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from build_snp_tree import neighbor_joining
 from collect_provenance import collect
 from classify_with_mlst import interpret_mlst, parse_mlst_csv, route_for_organism
-from common import WorkflowError
+from common import WorkflowError, executable_version
 from fetch_reference_genomes import fetch_genomes
 from inspect_input import inspect
 from interpret_snp_resolution import interpret as interpret_snp_resolution
@@ -176,6 +176,27 @@ class MlstRoutingTests(unittest.TestCase):
 
 
 class FailureAndProvenanceTests(unittest.TestCase):
+    def test_executable_version_records_real_version_on_success(self):
+        result = executable_version("python3", args=("--version",))
+        self.assertTrue(result["available"])
+        self.assertEqual(result["returncode"], 0)
+        self.assertIsNotNone(result["version"])
+
+    @patch("common.subprocess.run")
+    @patch("common.shutil.which", return_value="/opt/conda/bin/sourmash")
+    def test_executable_version_does_not_report_traceback_as_a_version(self, _which, run):
+        # Observed for real: sourmash 4.6.1's own `--version` hits an unrelated
+        # upstream argparse bug and exits nonzero with a traceback on stderr.
+        # A nonzero exit must not be recorded as if the first line were a version.
+        run.return_value = type("Completed", (), {
+            "stdout": "", "stderr": "Traceback (most recent call last):\nArgumentError: ...",
+            "returncode": 1,
+        })()
+        result = executable_version("sourmash")
+        self.assertTrue(result["available"])
+        self.assertIsNone(result["version"])
+        self.assertIn("Traceback", result["error"])
+
     def test_missing_database(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(WorkflowError):

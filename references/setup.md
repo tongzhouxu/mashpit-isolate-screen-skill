@@ -5,9 +5,11 @@ Run analyses in the pinned container built from `container/Dockerfile`. Mashpit 
 Start Docker Desktop, then build from the repository's parent directory:
 
 ```bash
-docker build --tag mashpit-isolate-screen:local \
+docker build --platform linux/amd64 --tag mashpit-isolate-screen:local \
   --file mashpit-isolate-screen/container/Dockerfile mashpit-isolate-screen
 ```
+
+`--platform linux/amd64` is required on Apple Silicon (`quast=5.3.0` has no `linux/arm64` build for the pinned Python 3.11); it runs fine under emulation there.
 
 Run an assembly with a known organism:
 
