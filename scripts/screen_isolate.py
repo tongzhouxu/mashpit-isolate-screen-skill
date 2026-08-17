@@ -11,6 +11,7 @@ from collect_provenance import collect
 from classify_with_mlst import classify, route_for_organism
 from common import CONFIG_DIR, WorkflowError, effective_database_root, load_json, write_json
 from fetch_reference_genomes import fetch_genomes
+from generate_report import generate_report
 from inspect_input import inspect
 from interpret_snp_resolution import interpret as interpret_snp_resolution
 from parse_mashpit_results import interpret, load_candidates, locate_candidate_file
@@ -223,6 +224,7 @@ def screen(
     finally:
         result["user_summary"] = summary_text(result)
         write_json(output_dir / "result.json", result)
+        (output_dir / "report.md").write_text(generate_report(result), encoding="utf-8")
         provenance = collect(inputs, assembly, database_metadata, commands, result)
         write_json(output_dir / "provenance.json", provenance)
     return result

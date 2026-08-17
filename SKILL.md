@@ -19,7 +19,9 @@ Use the bundled scripts for computation. Do not construct bioinformatics command
 
 3. Read `OUTPUT_DIR/result.json`. Use `status`, `stop_reason`, and `user_summary` as the authoritative result.
 4. Report the concise summary first. State that a candidate is a screening result, not proof of outbreak relatedness. Recommend a validated high-resolution SNP comparison when a candidate is present.
-5. Link the user to `result.json`, `provenance.json`, and retained logs. Never invent a result if a file is missing or a stage failed.
+5. Link the user to `result.json`, `provenance.json`, `report.md`, and retained logs. Never invent a result if a file is missing or a stage failed.
+
+`OUTPUT_DIR/report.md` is a plain-language rendering of `result.json` for a non-technical reader — organism determination, Mashpit's candidate clusters and scores, and (when `--snp-resolve` ran) the ska2 SNP distance tables, confidence statement, and Newick tree. It is written on every run, not only `--snp-resolve` ones. Prefer linking to it over reciting JSON when the audience isn't reading code.
 
 Pass `--snp-resolve` to additionally compute ska2 pairwise SNP distances between the query and the relevant Mashpit representatives once a candidate is found (read [references/snp-resolution.md](references/snp-resolution.md) first). This is opt-in because, unlike the rest of the screen, it downloads representative genomes from NCBI. Report `result.json`'s `snp_resolution` block alongside the Mash result when present, including whether it agrees with Mashpit's top candidate.
 

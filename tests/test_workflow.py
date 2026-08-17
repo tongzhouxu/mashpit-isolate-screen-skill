@@ -12,6 +12,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from build_snp_tree import neighbor_joining
 from collect_provenance import collect
 from classify_with_mlst import interpret_mlst, parse_mlst_csv, route_for_organism
 from common import WorkflowError
@@ -383,6 +384,8 @@ class SnpResolutionTests(unittest.TestCase):
              "mismatch_proportion": 0.01, "match_count": 100, "mismatch_count": 1},
             {"sample1": "GCA_2", "sample2": "QUERY", "snp_distance": 2.0,
              "mismatch_proportion": 0.01, "match_count": 100, "mismatch_count": 1},
+            {"sample1": "GCA_1", "sample2": "GCA_2", "snp_distance": 6.0,
+             "mismatch_proportion": 0.01, "match_count": 100, "mismatch_count": 1},
         ]
         targets = [
             {"accession": "GCA_1", "cluster": "PDS0001"},
@@ -393,6 +396,10 @@ class SnpResolutionTests(unittest.TestCase):
         self.assertEqual(result["nearest_sample"], "GCA_2")
         self.assertEqual(result["nearest_cluster"], "PDS0002")
         self.assertFalse(result["agrees_with_mash_top_candidate"])
+        self.assertEqual(result["confidence"]["nearest_cluster"], "PDS0002")
+        self.assertEqual(result["confidence"]["next_cluster"], "PDS0001")
+        self.assertAlmostEqual(result["confidence"]["separation_ratio"], 2.5)
+        self.assertTrue(result["newick_tree"].startswith("("))
         self.assertTrue(result["warnings"])
 
     def test_interpret_snp_resolution_agrees_with_mash(self):
@@ -408,6 +415,26 @@ class SnpResolutionTests(unittest.TestCase):
                   "mismatch_proportion": 0.0, "match_count": 100, "mismatch_count": 0}]
         result = interpret_snp_resolution(rows, [], None)
         self.assertEqual(result["status"], "INSUFFICIENT_DATA")
+
+    def test_neighbor_joining_recovers_exact_additive_tree(self):
+        # Distances summed along a known tree ((A:2,B:3):1,(C:4,D:5):1); NJ is
+        # guaranteed to recover an additive tree exactly, so this checks the
+        # implementation bit-for-bit rather than just "it runs".
+        rows = [
+            {"sample1": "A", "sample2": "B", "snp_distance": 5},
+            {"sample1": "A", "sample2": "C", "snp_distance": 8},
+            {"sample1": "A", "sample2": "D", "snp_distance": 9},
+            {"sample1": "B", "sample2": "C", "snp_distance": 9},
+            {"sample1": "B", "sample2": "D", "snp_distance": 10},
+            {"sample1": "C", "sample2": "D", "snp_distance": 9},
+        ]
+        newick = neighbor_joining(rows)
+        self.assertEqual(newick, "((A:2.0000,B:3.0000):1.0000,(C:4.0000,D:5.0000):1.0000);")
+
+    def test_neighbor_joining_two_taxa(self):
+        # Labels are sorted, so GCA_1 sorts before QUERY.
+        rows = [{"sample1": "QUERY", "sample2": "GCA_1", "snp_distance": 10}]
+        self.assertEqual(neighbor_joining(rows), "(GCA_1:5.0000,QUERY:5.0000);")
 
 
 if __name__ == "__main__":
