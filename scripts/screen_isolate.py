@@ -15,6 +15,7 @@ from generate_report import generate_report
 from inspect_input import inspect
 from interpret_snp_resolution import interpret as interpret_snp_resolution
 from parse_mashpit_results import interpret, load_candidates, locate_candidate_file
+from render_snp_tree import render_from_interpretation
 from run_assembly_workflow import run_workflow
 from run_mashpit import run_mashpit
 from run_ska import run_ska
@@ -107,6 +108,7 @@ def run_snp_resolution(
     ska_result = run_ska(genomes, output_dir / "ska", kmer_size)
     commands.extend(ska_result["commands"])
     interpretation = interpret_snp_resolution(ska_result["distances"], targets_result["targets"], best_cluster)
+    interpretation["tree_image"] = render_from_interpretation(interpretation, output_dir / "tree.png")
     write_json(output_dir / "interpretation.json", interpretation)
     return {"snp_resolution": interpretation, "commands": commands}
 

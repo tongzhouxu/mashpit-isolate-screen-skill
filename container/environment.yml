@@ -4,6 +4,8 @@ channels:
   - bioconda
 dependencies:
   - python=3.11.10
+  - c-compiler
+  - cxx-compiler
   - fastp=0.23.4
   - skesa=2.5.1
   - quast=5.3.0

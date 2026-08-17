@@ -22,6 +22,7 @@ from interpret_snp_resolution import interpret as interpret_snp_resolution
 from parse_mashpit_results import interpret, load_candidates
 from run_assembly_workflow import run_workflow
 from run_mashpit import run_mashpit, validate_database
+from render_snp_tree import render_from_interpretation
 from run_ska import parse_distance_table, run_ska
 from screen_isolate import screen
 from select_snp_targets import select_targets
@@ -400,6 +401,12 @@ class SnpResolutionTests(unittest.TestCase):
         self.assertEqual(result["confidence"]["next_cluster"], "PDS0001")
         self.assertAlmostEqual(result["confidence"]["separation_ratio"], 2.5)
         self.assertTrue(result["newick_tree"].startswith("("))
+        # Tips are labeled with their cluster so a tree viewer shows more than an
+        # opaque accession; QUERY itself has no cluster, so it stays unlabeled.
+        self.assertIn("GCA_1_PDS0001", result["newick_tree"])
+        self.assertIn("GCA_2_PDS0002", result["newick_tree"])
+        self.assertIn("QUERY", result["newick_tree"])
+        self.assertNotIn("QUERY_", result["newick_tree"])
         self.assertTrue(result["warnings"])
 
     def test_interpret_snp_resolution_agrees_with_mash(self):
@@ -430,6 +437,27 @@ class SnpResolutionTests(unittest.TestCase):
         ]
         newick = neighbor_joining(rows)
         self.assertEqual(newick, "((A:2.0000,B:3.0000):1.0000,(C:4.0000,D:5.0000):1.0000);")
+
+    def test_render_from_interpretation_skips_without_tree(self):
+        result = render_from_interpretation({"ranked": []}, Path("unused.png"))
+        self.assertEqual(result["status"], "SKIPPED")
+
+    @patch("render_snp_tree.render")
+    def test_render_from_interpretation_reports_failure_without_raising(self, render):
+        render.side_effect = RuntimeError("matplotlib backend unavailable")
+        result = render_from_interpretation(
+            {"newick_tree": "(A:1,B:1);", "ranked": [{"sample": "A"}]}, Path("unused.png")
+        )
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("matplotlib", result["error"])
+
+    @patch("render_snp_tree.render")
+    def test_render_from_interpretation_passes_through_on_success(self, render):
+        result = render_from_interpretation(
+            {"newick_tree": "(A:1,B:1);", "ranked": [{"sample": "A"}]}, Path("tree.png")
+        )
+        self.assertEqual(result["status"], "PASS")
+        render.assert_called_once()
 
     def test_neighbor_joining_two_taxa(self):
         # Labels are sorted, so GCA_1 sorts before QUERY.

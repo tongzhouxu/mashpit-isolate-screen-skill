@@ -45,6 +45,24 @@ def query_distances(distance_rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     return results
 
 
+def _display_label(sample: str, accession_to_cluster: dict[str, str]) -> str:
+    cluster = accession_to_cluster.get(sample)
+    return sample if cluster is None else f"{sample}_{cluster}"
+
+
+def _relabel_rows(
+    distance_rows: list[dict[str, Any]], accession_to_cluster: dict[str, str]
+) -> list[dict[str, Any]]:
+    relabeled = []
+    for row in distance_rows:
+        relabeled.append({
+            **row,
+            "sample1": _display_label(row["sample1"], accession_to_cluster),
+            "sample2": _display_label(row["sample2"], accession_to_cluster),
+        })
+    return relabeled
+
+
 def cluster_summary(ranked: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_cluster: dict[str, list[float]] = {}
     for item in ranked:
@@ -125,7 +143,7 @@ def interpret(
         )
     summary = cluster_summary(ranked)
     try:
-        newick = neighbor_joining(distance_rows)
+        newick = neighbor_joining(_relabel_rows(distance_rows, accession_to_cluster))
         tree_status = "PASS"
     except WorkflowError as error:
         newick = None

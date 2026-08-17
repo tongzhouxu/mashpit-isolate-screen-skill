@@ -112,10 +112,22 @@ def _snp_section(result: dict[str, Any]) -> list[str]:
     lines.append(f"**Bottom line:** {confidence.get('statement', 'No confidence statement available.')}")
 
     lines.append("")
+    lines.append("**Tree of everything compared, with your query highlighted:**")
+    lines.append("")
+    tree_image = snp.get("tree_image") or {}
+    if tree_image.get("status") == "PASS":
+        lines.append("![SNP tree with query highlighted](snp_resolution/tree.png)")
+    else:
+        lines.append(
+            "(Image rendering "
+            + ("was skipped: " + tree_image.get("reason", "") if tree_image.get("status") == "SKIPPED"
+               else "failed: " + tree_image.get("error", "unknown error"))
+            + " - the Newick text below can still be pasted into a tree viewer such as "
+            "[iTOL](https://itol.embl.de/) or FigTree.)"
+        )
+    lines.append("")
     lines.append(
-        "**Tree of everything compared** (Newick format - paste into a tree viewer such as "
-        "[iTOL](https://itol.embl.de/) or FigTree to see it drawn out; also saved as "
-        "`snp_resolution/interpretation.json`'s `newick_tree` field):"
+        "Newick text (also saved as `snp_resolution/interpretation.json`'s `newick_tree` field):"
     )
     lines.append("")
     lines.append("```")
