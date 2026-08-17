@@ -1,6 +1,6 @@
 ---
 name: mashpit-isolate-screen
-description: Reproducibly screen bacterial isolate assemblies or paired-end Illumina FASTQ/FASTQ.GZ reads with Mashpit. Use when Codex needs to validate isolate inputs, run fixed read QC and assembly, assess bacterial assembly quality, select a Salmonella, Escherichia coli, Listeria, Campylobacter, or Cronobacter database from a user-provided organism or local MLST classification, run Mashpit, interpret structured candidate-cluster results, or explain conservative failure and setup states.
+description: Reproducibly screen bacterial isolate assemblies or paired-end Illumina FASTQ/FASTQ.GZ reads with Mashpit. Use when Codex needs to validate isolate inputs, run fixed read QC and assembly, assess bacterial assembly quality, select a Salmonella, Escherichia coli/Shigella, Listeria, Campylobacter, or Cronobacter database from a user-provided organism or local MLST classification, run Mashpit, interpret structured candidate-cluster results, or explain conservative failure and setup states.
 ---
 
 # Mashpit isolate screening
@@ -25,7 +25,7 @@ Pass `--snp-resolve` to additionally compute ska2 pairwise SNP distances between
 
 The script accepts exactly one assembly (`.fa`, `.fasta`, `.fna`) or one recognized R1/R2 FASTQ pair. The FASTQ path uses the fixed workflow described in [references/workflow.md](references/workflow.md). Long reads, hybrid reads, interleaved reads, and metagenomes are unsupported.
 
-Use `--organism` when the organism is already known. It accepts `salmonella`, `ecoli`, `listeria`, `campylobacter`, or `cronobacter` and directly selects that database. When omitted, the fixed workflow runs local `mlst --full --csv` against its pinned bundled PubMLST schemes and maps the detected scheme to a supported database. It does not upload sequence data.
+Use `--organism` when the organism is already known. It accepts `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, or `cronobacter` and directly selects that database. When omitted, the fixed workflow runs local `mlst --full --csv` against its pinned bundled PubMLST schemes and maps the detected scheme to a supported database. It does not upload sequence data.
 
 ## Apply stop rules
 

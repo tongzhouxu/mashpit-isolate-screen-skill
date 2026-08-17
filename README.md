@@ -6,7 +6,7 @@ A local, deterministic Codex Skill for screening bacterial isolate assemblies or
 
 - With `--organism`: select that organism's local Mashpit database directly.
 - Without `--organism`: run local `mlst` 2.35.0 against its bundled PubMLST schemes, map the selected scheme to a supported group, then query only that Mashpit database.
-- Supported keys: `salmonella`, `ecoli`, `listeria`, `campylobacter`, and `cronobacter`.
+- Supported keys: `salmonella`, `ecoli_shigella`, `listeria`, `campylobacter`, and `cronobacter`.
 
 No assembly is uploaded. Mashpit is installed from upstream commit `538d3421302fe6dd129780605b8ff5dedbf4c046c`.
 

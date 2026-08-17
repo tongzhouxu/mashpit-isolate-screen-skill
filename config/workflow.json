@@ -20,7 +20,7 @@
   },
   "databases": [
     {"name": "salmonella", "organism_key": "salmonella", "organism": "Salmonella"},
-    {"name": "ecoli", "organism_key": "ecoli", "organism": "Escherichia coli"},
+    {"name": "ecoli_shigella", "organism_key": "ecoli_shigella", "organism": "Escherichia coli / Shigella"},
     {"name": "listeria", "organism_key": "listeria", "organism": "Listeria"},
     {"name": "campylobacter", "organism_key": "campylobacter", "organism": "Campylobacter"},
     {"name": "cronobacter", "organism_key": "cronobacter", "organism": "Cronobacter"}

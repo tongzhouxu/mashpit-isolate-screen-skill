@@ -6,8 +6,8 @@
   "rejected_statuses": ["NONE", "MIXED", "BAD"],
   "schemes": {
     "senterica": "salmonella",
-    "ecoli": "ecoli",
-    "ecoli_2": "ecoli",
+    "ecoli": "ecoli_shigella",
+    "ecoli_2": "ecoli_shigella",
     "lmonocytogenes": "listeria",
     "campylobacter": "campylobacter",
     "cconcisus": "campylobacter",

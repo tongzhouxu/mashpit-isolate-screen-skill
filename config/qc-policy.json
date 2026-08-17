@@ -16,7 +16,7 @@
   },
   "organisms": {
     "salmonella": {"minimum_length": 4300000, "maximum_length": 5300000, "max_contigs": 500},
-    "ecoli": {"minimum_length": 4500000, "maximum_length": 5900000, "max_contigs": 1000},
+    "ecoli_shigella": {"minimum_length": 4500000, "maximum_length": 5900000, "max_contigs": 1000},
     "listeria": {"minimum_length": 2700000, "maximum_length": 3200000, "max_contigs": 500},
     "campylobacter": {"minimum_length": 1500000, "maximum_length": 1900000, "max_contigs": 500},
     "cronobacter": {"minimum_length": 4000000, "maximum_length": 5000000, "max_contigs": 500}

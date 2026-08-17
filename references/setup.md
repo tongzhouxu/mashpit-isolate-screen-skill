@@ -28,7 +28,7 @@ Set `MASHPIT_DATABASE_ROOT` or pass `--database-root`. The directory must contai
 ```text
 databases/
 ├── salmonella/
-├── ecoli/
+├── ecoli_shigella/
 ├── listeria/
 ├── campylobacter/
 └── cronobacter/

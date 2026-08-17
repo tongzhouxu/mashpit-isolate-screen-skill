@@ -229,7 +229,7 @@ def main() -> int:
     parser.add_argument("--database-root")
     parser.add_argument(
         "--organism",
-        choices=("salmonella", "ecoli", "listeria", "campylobacter", "cronobacter"),
+        choices=("salmonella", "ecoli_shigella", "listeria", "campylobacter", "cronobacter"),
         help="Known organism/database key. If omitted, local mlst auto-detects a PubMLST scheme.",
     )
     parser.add_argument(

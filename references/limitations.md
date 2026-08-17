@@ -6,7 +6,7 @@ The workflow does not confirm outbreak membership, transmission, source attribut
 
 Local MLST auto-detection and the QC policy require validation with positive controls, unsupported near neighbors, contaminated isolates, and site-specific sequencing distributions. MLST scheme selection is not a general taxonomic classifier and can misassign close relatives or poor/mixed assemblies. A user-supplied organism bypasses this check. Cronobacter QC bounds especially require empirical calibration. The workflow retains warnings rather than masking these limitations.
 
-The bundled `ecoli` MLST scheme is shared by Escherichia and Shigella in the upstream scheme metadata, so automatic routing cannot reliably distinguish those genera. Treat an automatically selected E. coli database as a routing choice, not definitive species identification.
+The bundled `ecoli`/`ecoli_2` PubMLST schemes are shared by Escherichia and Shigella in the upstream scheme metadata, so automatic routing cannot reliably distinguish those genera. This is why the routed database key is `ecoli_shigella`, not `ecoli`: treat a selected `ecoli_shigella` database as a routing choice, not definitive species identification, whether reached via `--organism` or local MLST.
 
 Database creation and updating are outside scope. Results are only reproducible when the exact Mashpit databases, checksums, pinned source commit, container digest, and provenance are retained.
 

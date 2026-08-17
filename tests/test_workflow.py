@@ -56,7 +56,7 @@ class InputAndQcTests(unittest.TestCase):
     def test_supported_organism_length_policies(self):
         cases = {
             "salmonella": 4_700_000,
-            "ecoli": 5_000_000,
+            "ecoli_shigella": 5_000_000,
             "listeria": 2_900_000,
             "campylobacter": 1_700_000,
             "cronobacter": 4_500_000,
@@ -122,7 +122,7 @@ class MlstRoutingTests(unittest.TestCase):
 
     def test_routes_supported_pubmlst_schemes(self):
         cases = {
-            "senterica": "salmonella", "ecoli": "ecoli",
+            "senterica": "salmonella", "ecoli": "ecoli_shigella",
             "lmonocytogenes": "listeria", "campylobacter": "campylobacter",
             "cronobacter": "cronobacter",
         }
@@ -150,7 +150,7 @@ class MlstRoutingTests(unittest.TestCase):
             self.assertEqual(parse_mlst_csv(path)["SCHEME"], "ecoli")
 
     def test_user_organism_selects_database_without_classification(self):
-        for organism in ("salmonella", "ecoli", "listeria", "campylobacter", "cronobacter"):
+        for organism in ("salmonella", "ecoli_shigella", "listeria", "campylobacter", "cronobacter"):
             with self.subTest(organism=organism):
                 route = route_for_organism(organism)
                 self.assertEqual(route["source"], "user")
