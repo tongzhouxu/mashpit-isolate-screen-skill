@@ -5,7 +5,7 @@ Run analyses in the pinned container built from `container/Dockerfile`. Mashpit 
 Pull the published image:
 
 ```bash
-docker pull ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest
+docker pull --platform linux/amd64 ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest
 docker tag ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest mashpit-isolate-screen:local
 ```
 

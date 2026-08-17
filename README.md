@@ -13,7 +13,7 @@ You need two things: the container image, and a Mashpit database for at least on
 **1. Get the image** — either pull the pre-built one:
 
 ```bash
-docker pull ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest
+docker pull --platform linux/amd64 ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest
 docker tag ghcr.io/tongzhouxu/mashpit-isolate-screen-skill:latest mashpit-isolate-screen:local
 ```
 
@@ -23,7 +23,7 @@ or build it yourself:
 docker build --platform linux/amd64 --tag mashpit-isolate-screen:local --file container/Dockerfile .
 ```
 
-`--platform linux/amd64` is required on Apple Silicon: `quast=5.3.0` has no native `linux/arm64` build compatible with the pinned Python 3.11. It runs fine there under emulation.
+`--platform linux/amd64` is required everywhere here, not just on Apple Silicon: the image is only published/buildable for `linux/amd64` because `quast=5.3.0` has no native `linux/arm64` build compatible with the pinned Python 3.11. It runs fine under emulation on Apple Silicon; omitting the flag there pulls/builds nothing since Docker defaults to your host's native architecture.
 
 **2. Get a database** — download the pre-built ones from [Releases](../../releases/tag/databases-v1):
 
