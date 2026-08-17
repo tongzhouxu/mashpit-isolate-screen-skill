@@ -19,7 +19,7 @@ from common import WorkflowError, executable_version
 from fetch_reference_genomes import fetch_genomes
 from inspect_input import inspect
 from interpret_snp_resolution import interpret as interpret_snp_resolution
-from parse_mashpit_results import interpret, load_candidates
+from parse_mashpit_results import interpret, load_candidates, locate_tree_image
 from run_assembly_workflow import run_workflow
 from run_mashpit import run_mashpit, validate_database
 from render_snp_tree import render_from_interpretation
@@ -84,6 +84,18 @@ class InputAndQcTests(unittest.TestCase):
 
 
 class MashpitParsingTests(unittest.TestCase):
+    def test_locate_tree_image_finds_the_single_match(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "sample_tree.png").write_bytes(b"fake-png")
+            self.assertEqual(locate_tree_image(root), root / "sample_tree.png")
+
+    def test_locate_tree_image_returns_none_when_absent(self):
+        # Not an error: Mashpit itself skips tree generation below --threshold
+        # or when fewer than two candidates qualify.
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertIsNone(locate_tree_image(Path(temporary)))
+
     def write_candidates(self, path: Path, rows: list[dict]) -> None:
         fields = ["PDS_acc", "best_similarity_score", "near_top"]
         with path.open("w", encoding="utf-8", newline="") as handle:

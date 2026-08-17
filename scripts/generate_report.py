@@ -56,6 +56,18 @@ def _mashpit_section(result: dict[str, Any]) -> list[str]:
             "to be a plausible match at this coarse screening resolution. This is exactly what SNP-level "
             "resolution (below) is for."
         )
+    tree_image = match.get("tree_image") or {}
+    lines.append("")
+    if tree_image.get("status") == "PASS":
+        lines.append(
+            "**Mash tree** (coarse, sketch-based resolution - the query alongside its closest database "
+            "representatives above Mashpit's 0.85 similarity threshold; built by Mashpit itself during "
+            "the query, not by this skill):"
+        )
+        lines.append("")
+        lines.append("![Mashpit tree](mashpit_tree.png)")
+    else:
+        lines.append(f"(No Mash tree available: {tree_image.get('reason', 'unknown reason')})")
     return lines
 
 
@@ -112,7 +124,10 @@ def _snp_section(result: dict[str, Any]) -> list[str]:
     lines.append(f"**Bottom line:** {confidence.get('statement', 'No confidence statement available.')}")
 
     lines.append("")
-    lines.append("**Tree of everything compared, with your query highlighted:**")
+    lines.append(
+        "**SNP tree** (exact base-by-base resolution, built from the ska2 distances above, not from "
+        "Mash sketches - your query highlighted):"
+    )
     lines.append("")
     tree_image = snp.get("tree_image") or {}
     if tree_image.get("status") == "PASS":

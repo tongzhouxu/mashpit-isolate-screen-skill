@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ from fetch_reference_genomes import fetch_genomes
 from generate_report import generate_report
 from inspect_input import inspect
 from interpret_snp_resolution import interpret as interpret_snp_resolution
-from parse_mashpit_results import interpret, load_candidates, locate_candidate_file
+from parse_mashpit_results import interpret, load_candidates, locate_candidate_file, locate_tree_image
 from render_snp_tree import render_from_interpretation
 from run_assembly_workflow import run_workflow
 from run_mashpit import run_mashpit
@@ -197,6 +198,18 @@ def screen(
         mashpit_profile = load_json(CONFIG_DIR / "workflow.json")["mashpit"]
         parsed = interpret(load_candidates(candidate_file), threshold=mashpit_profile["threshold"])
         parsed["source_file"] = str(candidate_file)
+        mashpit_tree_source = locate_tree_image(Path(mashpit_run["output_directory"]))
+        if mashpit_tree_source:
+            shutil.copy2(mashpit_tree_source, output_dir / "mashpit_tree.png")
+            parsed["tree_image"] = {"status": "PASS", "path": str(output_dir / "mashpit_tree.png")}
+        else:
+            parsed["tree_image"] = {
+                "status": "UNAVAILABLE",
+                "reason": (
+                    "Mashpit did not generate a tree for this query (top hit below --threshold, "
+                    "or fewer than two candidates qualified)."
+                ),
+            }
         write_json(output_dir / "mashpit_result.json", parsed)
         result["mashpit_result"] = parsed
         result["warnings"].extend(parsed.get("warnings", []))

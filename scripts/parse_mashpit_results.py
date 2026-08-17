@@ -73,6 +73,14 @@ def locate_representative_file(output_dir: Path) -> Path:
     return matches[0]
 
 
+def locate_tree_image(output_dir: Path) -> Path | None:
+    # Unlike the two locators above, a missing tree is not an error: Mashpit
+    # itself skips tree generation when the top hit is below --threshold or
+    # fewer than two candidates qualify (see references/mashpit-interpretation.md).
+    matches = list(output_dir.glob("*_tree.png"))
+    return matches[0] if len(matches) == 1 else None
+
+
 def best_representative_score(output_dir: Path) -> float:
     path = locate_representative_file(output_dir)
     with path.open(encoding="utf-8", newline="") as handle:
